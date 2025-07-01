@@ -14,7 +14,6 @@ try:
             model_id: str,
             context_length: int = 12000,
             cache_dir: Optional[Union[str, os.PathLike[str]]] = None,
-            gpu_layer_attempts: Tuple[int] = (-1, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0),
             **kwargs
         ):
             self.model_id = model_id
@@ -26,51 +25,7 @@ try:
             if 'verbose' not in kwargs:
                 kwargs['verbose'] = False
 
-            if 'n_gpu_layers' in kwargs:
-                start_layers = kwargs['n_gpu_layers']
-                # start from the n_gpu_layers specified
-                gpu_layer_attempts = [l for l in gpu_layer_attempts if l <= start_layers]
-
-            if sys.platform == "win32":  # settings against Windows CUDA error
-                gpu_layer_attempts = (0, )
-
-            last_error = None
-
-            for n_layers in gpu_layer_attempts:
-                try:
-                    try:
-                        import torch
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                    except:
-                        pass
-                    gc.collect()
-
-                    kwargs_copy = kwargs.copy()
-                    kwargs_copy['n_gpu_layers'] = n_layers
-
-                    self.model = Llama.from_pretrained(**kwargs_copy)
-
-                    print(f"INFO:     Model {model_id} loaded with {n_layers} GPU layers.")
-
-                    # Display GPU memory usage (if available)
-                    try:
-                        from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlShutdown
-                        if n_layers > 0:
-                            handle = nvmlDeviceGetHandleByIndex(0)
-                            meminfo = nvmlDeviceGetMemoryInfo(handle)
-                            memory_allocated = meminfo.used / 1024**3
-                            total_memory = meminfo.total / 1024**3
-                            nvmlShutdown()
-                            print(f"INFO:     GPU memory usage: {memory_allocated:.2f}GB / {total_memory:.2f}GB")
-                    except:
-                        pass
-                    return
-                except Exception as e:
-                    print(f"ERROR:    Memory allocation error occurred while loading {model_id} model with {n_layers} layers: {e}")
-
-            # If all attempts failed
-            raise RuntimeError(f"ERROR:    Failed to load {model_id} model with all GPU layer configurations. Last error: {last_error}")
+            self.model = Llama.from_pretrained(**kwargs)
 
         def __call__(
             self,

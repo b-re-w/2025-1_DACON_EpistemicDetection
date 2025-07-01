@@ -40,7 +40,7 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     # Core ML/AI frameworks
     "huggingface_hub>=0.31.2",
