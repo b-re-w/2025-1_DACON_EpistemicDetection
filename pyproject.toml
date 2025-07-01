@@ -90,16 +90,9 @@ docs = [
 notebooks = [
     "jupyter>=1.0.0",
     "ipykernel>=6.0.0",
+    "notebook>=7.4.0",
     "ipywidgets>=8.0.0",
     "plotly>=5.0.0",
-]
-
-# Korean language specific dependencies
-korean = [
-    "konlpy>=0.6.0",
-    "soynlp>=0.0.493",
-    "kiwipiepy>=0.16.0",
-    "mecab-python3>=1.0.0",
 ]
 
 # Advanced ML dependencies
@@ -112,7 +105,7 @@ advanced = [
 
 # All dependencies
 all = [
-    "epidec[dev,docs,notebooks,korean,advanced]"
+    "epidec[dev,docs,notebooks,advanced]"
 ]
 
 [tool.uv.sources]
@@ -137,12 +130,6 @@ Repository = "https://github.com/yourusername/epistemic-detection"
 Documentation = "https://epistemic-detection.readthedocs.io"
 "Bug Tracker" = "https://github.com/yourusername/epistemic-detection/issues"
 "Changelog" = "https://github.com/yourusername/epistemic-detection/blob/main/CHANGELOG.md"
-
-[project.scripts]
-epidec = "epidec.cli:main"
-epidec-train = "epidec.training.cli:main"
-epidec-eval = "epidec.evaluation.cli:main"
-epidec-server = "epidec.api.server:main"
 
 # Flit module configuration
 [tool.flit.module]
