@@ -86,3 +86,26 @@ class SWUnivDaconDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx], (self.labels[idx] if self.is_train else None)
+
+
+class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
+    def _load_data(self, valid_ratio=0.2, seed=None):
+        if seed is None:
+            seed = self.random_state
+
+        if self.is_train:
+            data_files = pd.read_csv(self.root / self.dataset_name / self.train_file, encoding='utf-8-sig')
+
+            ai_count = len(data_files[data_files['generated'] == 1])
+            humans = data_files[data_files['generated'] == 0].sample(n=ai_count, random_state=seed)
+            data_files = pd.concat([humans, data_files[data_files['generated'] == 1]], ignore_index=True)
+
+            data, label, raw = data_files['full_text'], data_files['generated'], data_files
+            seperated = train_val_split(data, label, stratify=label, test_size=valid_ratio, random_state=seed)
+            if self.is_valid:
+                return seperated[1].tolist(), seperated[3].tolist(), raw
+            else:
+                return seperated[0].tolist(), seperated[2].tolist(), raw
+        else:
+            data_files = pd.read_csv(self.root / self.dataset_name / self.test_file, encoding='utf-8-sig')
+            return data_files['paragraph_text'].tolist(), [], data_files

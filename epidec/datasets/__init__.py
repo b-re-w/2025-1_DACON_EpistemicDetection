@@ -1,1 +1,1 @@
-from .swuniv_dacon import SWUnivDaconDataset
+from .swuniv_dacon import SWUnivDaconDataset, BalancedSWUnivDaconDataset
