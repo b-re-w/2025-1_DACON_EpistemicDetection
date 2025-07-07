@@ -94,13 +94,32 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
         if seed is None:
             seed = self.random_state
 
-        if self.is_train:
-            data_files = pd.read_csv(self.root / self.dataset_name / self.train_file, encoding='utf-8-sig')
+        loaded = super()._load_data(valid_ratio=valid_ratio, seed=seed)
 
+        if self.is_train:
             ai_count = len(data_files[data_files['generated'] == 1])
             humans = data_files[data_files['generated'] == 0].sample(n=ai_count, random_state=seed)
             data_files = pd.concat([humans, data_files[data_files['generated'] == 1]], ignore_index=True)
 
+        else:
+            return loaded
+
+
+class AugmentedSWUnivDaconDataset(SWUnivDaconDataset):
+    def _load_data(self, valid_ratio=0.2, seed=None):
+        if seed is None:
+            seed = self.random_state
+
+        if not os.path.exists(self.root / self.dataset_name / self.augmented_file):
+            if os.path.exists(self.root / "../" / self.augmented_file):
+                os.rename(self.root / "../" / self.augmented_file, self.root / self.dataset_name / self.augmented_file)
+            else:
+                raise FileNotFoundError(f"Augmented data file '{self.augmented_file}' not found at {self.root}. Please run augmentation.ipynb first.")
+
+        loaded = super()._load_data(valid_ratio=valid_ratio, seed=seed)
+
+        if self.is_train:
+            data_files = pd.read_csv(self.root / self.dataset_name / self.augmented_file, encoding='utf-8-sig')
             data, label, raw = data_files['full_text'], data_files['generated'], data_files
             seperated = train_val_split(data, label, stratify=label, test_size=valid_ratio, random_state=seed)
             if self.is_valid:
@@ -108,5 +127,4 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
             else:
                 return seperated[0].tolist(), seperated[2].tolist(), raw
         else:
-            data_files = pd.read_csv(self.root / self.dataset_name / self.test_file, encoding='utf-8-sig')
-            return data_files['paragraph_text'].tolist(), [], data_files
+            return loaded
