@@ -52,6 +52,7 @@ class SWUnivDaconDataset(Dataset):
         self.root = Path(root)
         self.is_train = train
         self.is_valid = valid
+        self.data_file = ""
 
         self.data, self.labels, self.raw = self._load_data(valid_ratio=valid_ratio)
 
@@ -71,22 +72,37 @@ class SWUnivDaconDataset(Dataset):
             seed = self.random_state
 
         if self.is_train:
-            data_files = pd.read_csv(self.root / self.dataset_name / self.train_file, encoding='utf-8-sig')
-            data, label, raw = data_files['full_text'], data_files['generated'], data_files
-            seperated = train_val_split(data, label, stratify=label, test_size=valid_ratio, random_state=seed)
-            if self.is_valid:
-                return seperated[1].tolist(), seperated[3].tolist(), raw
+            if valid_ratio == 0:
+                self.data_file = self.train_file
             else:
-                return seperated[0].tolist(), seperated[2].tolist(), raw
+                # load train data
+                data_files = pd.read_csv(self.root / self.dataset_name / self.train_file, encoding='utf-8-sig')
+
+                # train/valid split
+                data, label, raw = data_files['full_text'], data_files['generated'], data_files
+                seperated = train_val_split(range(len(data)), label, stratify=label, test_size=valid_ratio, random_state=seed)
+
+                # save seperated data
+                train_raw, valid_raw = raw.iloc[seperated[0]], raw.iloc[seperated[1]]
+                train_file = self.train_file.replace("train", f"train_{1-valid_ratio:.2f}")
+                valid_file = self.train_file.replace("train", f"valid_{valid_ratio:.2f}")
+                train_raw.to_csv(self.root / self.dataset_name / train_file, index=False)
+                valid_raw.to_csv(self.root / self.dataset_name / valid_file, index=False)
+                self.data_file = valid_file if self.is_valid else train_file
         else:
-            data_files = pd.read_csv(self.root / self.dataset_name / self.test_file, encoding='utf-8-sig')
+            self.data_file = self.test_file
+
+        data_files = pd.read_csv(self.root / self.dataset_name / self.data_file, encoding='utf-8-sig')
+        if self.is_train:
+            return data_files['full_text'].tolist(), data_files['generated'].tolist(), data_files
+        else:
             return data_files['paragraph_text'].tolist(), [], data_files
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx], (self.labels[idx] if self.is_train else None)
+        return self.data[idx], (self.labels[idx] if self.is_train else -1)
 
 
 class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
@@ -94,18 +110,31 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
         if seed is None:
             seed = self.random_state
 
-        loaded = super()._load_data(valid_ratio=valid_ratio, seed=seed)
+        data, labels, raw = super()._load_data(valid_ratio=valid_ratio, seed=seed)
 
         if self.is_train:
-            ai_count = len(data_files[data_files['generated'] == 1])
-            humans = data_files[data_files['generated'] == 0].sample(n=ai_count, random_state=seed)
-            data_files = pd.concat([humans, data_files[data_files['generated'] == 1]], ignore_index=True)
-
+            ai_count = len(raw[raw['generated'] == 1])
+            humans = raw[raw['generated'] == 0].sample(n=ai_count, random_state=seed)
+            raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=True)
+            return raw['full_text'].tolist(), raw['generated'].tolist(), raw
         else:
-            return loaded
+            return data, labels, raw
 
 
 class AugmentedSWUnivDaconDataset(SWUnivDaconDataset):
+    train_file = SWUnivDaconDataset.augmented_file
+
+    def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2, return_original: bool = False):
+        self._download(root, force=force_download)
+
+        self.root = Path(root)
+        self.is_train = train
+        self.is_valid = valid
+        self.data_file = ""
+        self.return_original = return_original
+
+        self.data, self.original, self.labels, self.raw = self._load_data(valid_ratio=valid_ratio)
+
     def _load_data(self, valid_ratio=0.2, seed=None):
         if seed is None:
             seed = self.random_state
@@ -116,15 +145,14 @@ class AugmentedSWUnivDaconDataset(SWUnivDaconDataset):
             else:
                 raise FileNotFoundError(f"Augmented data file '{self.augmented_file}' not found at {self.root}. Please run augmentation.ipynb first.")
 
-        loaded = super()._load_data(valid_ratio=valid_ratio, seed=seed)
+        data, labels, raw = super()._load_data(valid_ratio=valid_ratio, seed=seed)
 
         if self.is_train:
-            data_files = pd.read_csv(self.root / self.dataset_name / self.augmented_file, encoding='utf-8-sig')
-            data, label, raw = data_files['full_text'], data_files['generated'], data_files
-            seperated = train_val_split(data, label, stratify=label, test_size=valid_ratio, random_state=seed)
-            if self.is_valid:
-                return seperated[1].tolist(), seperated[3].tolist(), raw
-            else:
-                return seperated[0].tolist(), seperated[2].tolist(), raw
+            return raw['paraphrased_text'].tolist(), data, labels, raw
         else:
-            return loaded
+            return data, None, labels, raw
+
+    def __getitem__(self, idx):
+        if self.return_original and self.is_train:
+            return self.data[idx], self.original[idx], self.labels[idx]
+        return self.data[idx], (self.labels[idx] if self.is_train else -1)
