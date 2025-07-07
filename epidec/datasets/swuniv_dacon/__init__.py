@@ -41,6 +41,7 @@ class SWUnivDaconDataset(Dataset):
     download_url = "https://cfiles.dacon.co.kr/competitions/236473/open.zip"
     filename = "swuniv_dacon.zip"
     train_file = "train.csv"
+    augmented_file = "augmented.csv"
     test_file = "test.csv"
     submission_file = "sample_submission.csv"
     random_state = 42
