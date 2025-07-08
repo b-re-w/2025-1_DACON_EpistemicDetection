@@ -106,6 +106,10 @@ class SWUnivDaconDataset(Dataset):
 
 
 class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
+    def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2, balancing_ratio: float = 1.0):
+        self.balancing_ratio = balancing_ratio
+        super().__init__(root, force_download, train, valid, valid_ratio)
+
     def _load_data(self, valid_ratio=0.2, seed=None):
         if seed is None:
             seed = self.random_state
@@ -114,7 +118,7 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
 
         if self.is_train:
             ai_count = len(raw[raw['generated'] == 1])
-            humans = raw[raw['generated'] == 0].sample(n=ai_count, random_state=seed)
+            humans = raw[raw['generated'] == 0].sample(n=ai_count * self.balancing_ratio, random_state=seed)
             raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=True)
             return raw['full_text'].tolist(), raw['generated'].tolist(), raw
         else:
