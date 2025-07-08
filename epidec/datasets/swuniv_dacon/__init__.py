@@ -119,7 +119,7 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
         if self.is_train:
             ai_count = len(raw[raw['generated'] == 1])
             humans = raw[raw['generated'] == 0].sample(n=ai_count * self.balancing_ratio, random_state=seed)
-            raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=True)
+            raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=False)
             return raw['full_text'].tolist(), raw['generated'].tolist(), raw
         else:
             return data, labels, raw
