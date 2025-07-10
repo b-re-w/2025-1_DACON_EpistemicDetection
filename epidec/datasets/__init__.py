@@ -8,7 +8,6 @@ class BalancedDataLoader(DataLoader):
     """
     def __init__(self, dataset, resample_function=lambda dt: dt.resample(), *args, **kwargs):
         super().__init__(dataset, *args, **kwargs)
-        self.dataset = dataset
         self.resample_function = resample_function
 
     def __iter__(self):
