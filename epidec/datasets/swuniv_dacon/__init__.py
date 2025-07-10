@@ -48,6 +48,7 @@ class SWUnivDaconDataset(Dataset):
 
     def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2):
         self._download(root, force=force_download)
+        self.valid_ratio = valid_ratio
 
         self.root = Path(root)
         self.is_train = train
@@ -108,7 +109,12 @@ class SWUnivDaconDataset(Dataset):
 class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
     def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2, balancing_ratio: float = 1.0):
         self.balancing_ratio = balancing_ratio
+        self.sampling_seed = super().random_state
         super().__init__(root, force_download, train, valid, valid_ratio)
+
+    def resample(self):
+        self.sampling_seed = (self.sampling_seed + self.random_state) % 100000
+        self.data, self.labels, self.raw = self._load_data(valid_ratio=self.valid_ratio)
 
     def _load_data(self, valid_ratio=0.2, seed=None):
         if seed is None:
@@ -118,7 +124,7 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
 
         if self.is_train:
             ai_count = len(raw[raw['generated'] == 1])
-            humans = raw[raw['generated'] == 0].sample(n=int(ai_count * self.balancing_ratio), random_state=seed)
+            humans = raw[raw['generated'] == 0].sample(n=int(ai_count * self.balancing_ratio), random_state=self.sampling_seed)
             raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=False)
             return raw['full_text'].tolist(), raw['generated'].tolist(), raw
         else:
@@ -130,6 +136,7 @@ class AugmentedSWUnivDaconDataset(SWUnivDaconDataset):
 
     def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2, return_original: bool = False):
         self._download(root, force=force_download)
+        self.valid_ratio = valid_ratio
 
         self.root = Path(root)
         self.is_train = train
