@@ -123,12 +123,55 @@ class BalancedSWUnivDaconDataset(SWUnivDaconDataset):
         data, labels, raw = super()._load_data(valid_ratio=valid_ratio, seed=seed)
 
         if self.is_train:
-            ai_count = len(raw[raw['generated'] == 1])
-            humans = raw[raw['generated'] == 0].sample(n=int(ai_count * self.balancing_ratio), random_state=self.sampling_seed)
-            raw = pd.concat([humans, raw[raw['generated'] == 1]], ignore_index=False)
+            ais = raw[raw['generated'] == 1]
+            ai_count = len(ais)
+            human_count = int(ai_count * self.balancing_ratio)
+            humans = raw[raw['generated'] == 0].sample(n=human_count, random_state=self.sampling_seed)
+            raw = pd.concat([humans, ais], ignore_index=False).sample(frac=1, random_state=2025)
             return raw['full_text'].tolist(), raw['generated'].tolist(), raw
         else:
             return data, labels, raw
+
+
+class BalancedBaggedSWUnivDaconDataset(BalancedSWUnivDaconDataset):
+    def __init__(self, root: str, force_download: bool = False, train: bool = True, valid: bool = False, valid_ratio: float = 0.2, balancing_ratio: float = 1.0, bagging_size: int = 5):
+        self.bagging_size = bagging_size
+        super().__init__(root, force_download, train, valid, valid_ratio, balancing_ratio)
+
+    def resample(self):
+        raise NotImplementedError("Resampling is not supported for BalancedBaggedSWUnivDaconDataset. Use _load_data method instead.")
+
+    def _load_data(self, valid_ratio=0.2, seed=None):
+        if seed is None:
+            seed = self.random_state
+
+        if self.is_train and not self.is_valid:
+            data, labels, raw = super(BalancedSWUnivDaconDataset, self)._load_data(valid_ratio=valid_ratio, seed=seed)
+
+            raws = []
+            ais = raw[raw['generated'] == 1]
+            humans = raw[raw['generated'] == 0]
+            ai_count = len(ais)
+            human_count = int(ai_count * self.balancing_ratio)
+            if human_count * self.bagging_size > len(humans):
+                raise ValueError(f"Not enough human samples to create {self.bagging_size} bags with balancing ratio {self.balancing_ratio}. ({human_count} * {self.bagging_size} > {len(humans)})")
+            for _ in range(self.bagging_size):
+                sample_humans = humans.sample(n=human_count, random_state=self.sampling_seed)
+                raws.append(pd.concat([sample_humans, ais], ignore_index=False).sample(frac=1, random_state=2025))
+                humans = humans.drop(sample_humans.index)
+            print(f"INFO: Total {human_count * self.bagging_size} datas are used, {len(humans)} datas remain unused.")
+            return [raw['full_text'].tolist() for raw in raws], [raw['generated'].tolist() for raw in raws], raws
+        else:
+            return super()._load_data(valid_ratio=valid_ratio, seed=seed)
+
+    def __len__(self):
+        return len(self.data[0]) if self.is_train and not self.is_valid else len(self.data)
+
+    def __getitem__(self, idx):
+        if self.is_train and not self.is_valid:
+            return [[self.data[i][idx], self.labels[i][idx]] for i in range(self.bagging_size)]
+        else:
+            return super().__getitem__(idx)  # Call the parent method to handle test/validation data
 
 
 class AugmentedSWUnivDaconDataset(SWUnivDaconDataset):

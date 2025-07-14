@@ -1,4 +1,4 @@
-from .swuniv_dacon import SWUnivDaconDataset, BalancedSWUnivDaconDataset
+from .swuniv_dacon import SWUnivDaconDataset, BalancedSWUnivDaconDataset, BalancedBaggedSWUnivDaconDataset
 from torch.utils.data import DataLoader
 
 
